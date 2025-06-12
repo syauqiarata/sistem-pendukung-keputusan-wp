@@ -1,95 +1,91 @@
 <?php
-require_once 'includes/config.php';
+require_once 'config.php';
 
-// Function to calculate WP method
+// Function to calculate WP
 function calculateWP() {
     global $db;
-    
     try {
-        // Get all alternatifs
+        // Get all alternatives
         $stmt = $db->query("SELECT * FROM alternatif");
         $alternatifs = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        // Get all kriterias
+        // Get all criteria
         $stmt = $db->query("SELECT * FROM kriteria");
         $kriterias = $stmt->fetchAll(PDO::FETCH_ASSOC);
         
-        $results = [];
-        $total_s = 0;
-        
-        // Calculate S values
-        foreach ($alternatifs as $alternatif) {
-            $s_value = 1;
-            
-            foreach ($kriterias as $kriteria) {
-                // Get nilai for this alternatif and kriteria
-                $stmt = $db->prepare("
-                    SELECT nilai 
-                    FROM penilaian 
-                    WHERE alternatif_id = ? AND kriteria_id = ?
-                ");
-                $stmt->execute([$alternatif['id'], $kriteria['id']]);
-                $nilai = $stmt->fetchColumn();
-                
-                if ($nilai === false) {
-                    throw new Exception("Nilai tidak ditemukan untuk alternatif {$alternatif['nama']} pada kriteria {$kriteria['nama']}");
-                }
-                
-                // Calculate power based on kriteria type
-                $power = $kriteria['tipe'] === 'benefit' ? $kriteria['bobot'] : -$kriteria['bobot'];
-                
-                // Calculate partial S value
-                $s_value *= pow($nilai, $power);
-            }
-            
-            $results[$alternatif['id']] = [
-                'alternatif' => $alternatif,
-                'nilai_s' => $s_value
-            ];
-            
-            $total_s += $s_value;
+        // Get all scores
+        $stmt = $db->query("SELECT * FROM penilaian");
+        $penilaians = [];
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            $penilaians[$row['alternatif_id']][$row['kriteria_id']] = $row['nilai'];
         }
         
+        // Calculate S values
+        $s_values = [];
+        foreach ($alternatifs as $alternatif) {
+            if (!isset($penilaians[$alternatif['id']])) continue;
+            
+            $s = 1;
+            foreach ($kriterias as $kriteria) {
+                if (!isset($penilaians[$alternatif['id']][$kriteria['id']])) continue;
+                
+                $nilai = $penilaians[$alternatif['id']][$kriteria['id']];
+                $power = $kriteria['tipe'] === 'benefit' ? $kriteria['bobot'] : -$kriteria['bobot'];
+                $s *= pow($nilai, $power);
+            }
+            $s_values[$alternatif['id']] = $s;
+        }
+        
+        // Calculate total S
+        $total_s = array_sum($s_values);
+        
         // Calculate V values and store results
-        $db->beginTransaction();
-        
-        // Clear previous results
-        $db->query("DELETE FROM hasil_perhitungan");
-        
-        // Insert new results
-        $stmt = $db->prepare("
-            INSERT INTO hasil_perhitungan (alternatif_id, nilai_s, nilai_v, ranking)
-            VALUES (?, ?, ?, ?)
-        ");
-        
-        // Sort by V value for ranking
-        $rankings = [];
-        foreach ($results as $alternatif_id => $result) {
-            $v_value = $result['nilai_s'] / $total_s;
-            $rankings[] = [
-                'alternatif_id' => $alternatif_id,
-                'nilai_s' => $result['nilai_s'],
-                'nilai_v' => $v_value
+        $results = [];
+        foreach ($alternatifs as $alternatif) {
+            if (!isset($s_values[$alternatif['id']])) continue;
+            
+            $v = $s_values[$alternatif['id']] / $total_s;
+            $results[] = [
+                'alternatif_id' => $alternatif['id'],
+                'nama' => $alternatif['nama'],
+                'nilai_s' => $s_values[$alternatif['id']],
+                'nilai_v' => $v
             ];
         }
         
         // Sort by V value descending
-        usort($rankings, function($a, $b) {
+        usort($results, function($a, $b) {
             return $b['nilai_v'] <=> $a['nilai_v'];
         });
         
-        // Insert with rankings
-        foreach ($rankings as $rank => $data) {
+        // Add ranking
+        foreach ($results as $index => $result) {
+            $results[$index]['ranking'] = $index + 1;
+        }
+        
+        // Store results in database
+        $db->beginTransaction();
+        
+        // Clear old results
+        $db->exec("DELETE FROM hasil");
+        
+        // Insert new results
+        $stmt = $db->prepare("
+            INSERT INTO hasil (alternatif_id, nilai_s, nilai_v, ranking, tanggal) 
+            VALUES (?, ?, ?, ?, NOW())
+        ");
+        
+        foreach ($results as $result) {
             $stmt->execute([
-                $data['alternatif_id'],
-                $data['nilai_s'],
-                $data['nilai_v'],
-                $rank + 1
+                $result['alternatif_id'],
+                $result['nilai_s'],
+                $result['nilai_v'],
+                $result['ranking']
             ]);
         }
         
         $db->commit();
-        return true;
+        return $results;
         
     } catch (Exception $e) {
         if ($db->inTransaction()) {
@@ -99,36 +95,33 @@ function calculateWP() {
     }
 }
 
-// Handle calculation request
-if (isset($_POST['calculate'])) {
+// Handle recalculation request
+if (isset($_POST['recalculate'])) {
     try {
-        calculateWP();
-        setFlashMessage('success', 'Perhitungan berhasil dilakukan');
+        $results = calculateWP();
+        setFlash('success', 'Perhitungan berhasil diperbarui');
     } catch (Exception $e) {
-        setFlashMessage('danger', 'Gagal melakukan perhitungan: ' . $e->getMessage());
+        setFlash('danger', 'Gagal melakukan perhitungan: ' . $e->getMessage());
     }
     redirect('hasil.php');
 }
 
-// Get calculation results
+// Get latest results
 try {
     $stmt = $db->query("
-        SELECT h.*, a.nama as alternatif_nama
-        FROM hasil_perhitungan h
-        JOIN alternatif a ON a.id = h.alternatif_id
+        SELECT h.*, a.nama 
+        FROM hasil h 
+        JOIN alternatif a ON h.alternatif_id = a.id 
         ORDER BY h.ranking
     ");
     $results = $stmt->fetchAll(PDO::FETCH_ASSOC);
     
-    // Get last calculation time
-    $stmt = $db->query("
-        SELECT MAX(tanggal_perhitungan) as last_calculation
-        FROM hasil_perhitungan
-    ");
+    // Get calculation date
+    $stmt = $db->query("SELECT MAX(tanggal) as last_calc FROM hasil");
     $lastCalculation = $stmt->fetchColumn();
     
-} catch (PDOException $e) {
-    setFlashMessage('danger', 'Gagal mengambil hasil perhitungan: ' . $e->getMessage());
+} catch(PDOException $e) {
+    setFlash('danger', 'Gagal mengambil data hasil: ' . $e->getMessage());
     $results = [];
     $lastCalculation = null;
 }
@@ -139,44 +132,64 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hasil Perhitungan - SPK Metode WP</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="assets/css/style.css" rel="stylesheet">
+    <title>Hasil - <?= SITE_NAME ?></title>
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <?php include 'includes/navbar.php'; ?>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.php" class="navbar-brand"><?= SITE_NAME ?></a>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a href="index.php" class="nav-link">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a href="alternatif.php" class="nav-link">Alternatif</a>
+                </li>
+                <li class="nav-item">
+                    <a href="kriteria.php" class="nav-link">Kriteria</a>
+                </li>
+                <li class="nav-item">
+                    <a href="penilaian.php" class="nav-link">Penilaian</a>
+                </li>
+                <li class="nav-item">
+                    <a href="hasil.php" class="nav-link active">Hasil</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
 
-    <div class="container mt-4">
+    <div class="container">
         <?php
-        $flash = getFlashMessage();
-        if ($flash) {
-            echo "<div class='alert alert-{$flash['type']} alert-dismissible fade show' role='alert'>
-                    {$flash['message']}
-                    <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                  </div>";
-        }
+        $flash = getFlash();
+        if ($flash): 
         ?>
+        <div class="alert alert-<?= $flash['type'] ?>">
+            <?= $flash['message'] ?>
+        </div>
+        <?php endif; ?>
 
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Hasil Perhitungan</h5>
-                <div>
+            <div class="card-header">
+                <h2 class="card-title">
+                    Hasil Perhitungan
                     <?php if ($lastCalculation): ?>
-                    <small class="text-muted me-3">
-                        Perhitungan terakhir: <?= date('d/m/Y H:i', strtotime($lastCalculation)) ?>
-                    </small>
+                    <small>(<?= date('d/m/Y H:i', strtotime($lastCalculation)) ?>)</small>
                     <?php endif; ?>
-                    <form action="hasil.php" method="POST" class="d-inline">
-                        <button type="submit" name="calculate" class="btn btn-primary">
-                            Hitung Ulang
-                        </button>
-                    </form>
-                </div>
+                </h2>
+                <form action="hasil.php" method="POST" style="margin: 0;">
+                    <input type="hidden" name="recalculate" value="1">
+                    <button type="submit" class="btn btn-primary">Hitung Ulang</button>
+                </form>
             </div>
             <div class="card-body">
-                <?php if (!empty($results)): ?>
+                <?php if (empty($results)): ?>
+                <div class="alert alert-info">
+                    Belum ada hasil perhitungan. Silakan lakukan perhitungan terlebih dahulu.
+                </div>
+                <?php else: ?>
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>Ranking</th>
@@ -189,45 +202,39 @@ try {
                             <?php foreach ($results as $result): ?>
                             <tr>
                                 <td><?= $result['ranking'] ?></td>
-                                <td><?= htmlspecialchars($result['alternatif_nama']) ?></td>
-                                <td><?= number_format($result['nilai_s'], 4) ?></td>
-                                <td><?= number_format($result['nilai_v'], 4) ?></td>
+                                <td><?= htmlspecialchars($result['nama']) ?></td>
+                                <td><?= formatNumber($result['nilai_s']) ?></td>
+                                <td><?= formatNumber($result['nilai_v']) ?></td>
                             </tr>
                             <?php endforeach; ?>
                         </tbody>
                     </table>
                 </div>
-                
-                <!-- Chart visualization -->
-                <div class="mt-4">
-                    <canvas id="rankingChart"></canvas>
-                </div>
-                <?php else: ?>
-                <div class="text-center">
-                    <p class="mb-0">Belum ada hasil perhitungan</p>
+
+                <!-- Chart -->
+                <div class="chart-container" style="position: relative; height: 400px; margin-top: 2rem;">
+                    <canvas id="resultChart"></canvas>
                 </div>
                 <?php endif; ?>
             </div>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="assets/js/script.js"></script>
-    
     <?php if (!empty($results)): ?>
     <script>
         // Create chart
-        const ctx = document.getElementById('rankingChart').getContext('2d');
+        const ctx = document.getElementById('resultChart').getContext('2d');
         new Chart(ctx, {
             type: 'bar',
             data: {
-                labels: <?= json_encode(array_column($results, 'alternatif_nama')) ?>,
+                labels: <?= json_encode(array_column($results, 'nama')) ?>,
                 datasets: [{
                     label: 'Nilai V',
                     data: <?= json_encode(array_column($results, 'nilai_v')) ?>,
-                    backgroundColor: 'rgba(54, 162, 235, 0.5)',
-                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(52, 152, 219, 0.5)',
+                    borderColor: 'rgba(52, 152, 219, 1)',
                     borderWidth: 1
                 }]
             },
