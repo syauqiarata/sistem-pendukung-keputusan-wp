@@ -1,0 +1,53 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Alternatif {
+  id        Int      @id @default(autoincrement())
+  nama      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  scores    Score[]
+}
+
+model Kriteria {
+  id         Int          @id @default(autoincrement())
+  nama       String
+  bobot      Float        @default(0)
+  kategori   String       @default("benefit") // benefit or cost
+  createdAt  DateTime     @default(now())
+  updatedAt  DateTime     @updatedAt
+  subKriteria SubKriteria[]
+  scores     Score[]
+}
+
+model SubKriteria {
+  id         Int      @id @default(autoincrement())
+  nama       String
+  nilai      Float
+  kriteriaId Int
+  kriteria   Kriteria @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+model Score {
+  id           Int        @id @default(autoincrement())
+  alternatifId Int
+  kriteriaId   Int
+  nilai        Float
+  alternatif   Alternatif @relation(fields: [alternatifId], references: [id], onDelete: Cascade)
+  kriteria     Kriteria   @relation(fields: [kriteriaId], references: [id], onDelete: Cascade)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@unique([alternatifId, kriteriaId])
+}
