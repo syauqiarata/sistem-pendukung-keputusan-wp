@@ -1,5 +1,5 @@
 <?php
-require_once 'includes/config.php';
+require_once 'config.php';
 
 // Get statistics
 try {
@@ -42,108 +42,81 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title><?= APP_NAME ?></title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.7.2/font/bootstrap-icons.css">
-    <link href="assets/css/style.css" rel="stylesheet">
+    <title><?= SITE_NAME ?></title>
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <?php include 'includes/navbar.php'; ?>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.php" class="navbar-brand"><?= SITE_NAME ?></a>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a href="index.php" class="nav-link active">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a href="alternatif.php" class="nav-link">Alternatif</a>
+                </li>
+                <li class="nav-item">
+                    <a href="kriteria.php" class="nav-link">Kriteria</a>
+                </li>
+                <li class="nav-item">
+                    <a href="penilaian.php" class="nav-link">Penilaian</a>
+                </li>
+                <li class="nav-item">
+                    <a href="hasil.php" class="nav-link">Hasil</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
 
-    <div class="container mt-4">
-        <?php if (isset($error)): ?>
-            <div class="alert alert-danger alert-dismissible fade show" role="alert">
-                <?= $error ?>
-                <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-            </div>
+    <div class="container">
+        <?php
+        $flash = getFlash();
+        if ($flash): 
+        ?>
+        <div class="alert alert-<?= $flash['type'] ?>">
+            <?= $flash['message'] ?>
+        </div>
         <?php endif; ?>
 
-        <div class="row mb-4">
-            <div class="col-md-3">
-                <div class="card bg-primary text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title mb-0">Total Alternatif</h6>
-                                <h2 class="mt-2 mb-0"><?= $totalAlternatif ?? 0 ?></h2>
-                            </div>
-                            <i class="bi bi-people fs-1"></i>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-primary-dark">
-                        <a href="alternatif.php" class="text-white text-decoration-none">
-                            Kelola Alternatif <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
+        <div class="row">
+            <div class="col">
+                <div class="stats-card">
+                    <h3>Total Alternatif</h3>
+                    <p><?= $totalAlternatif ?? 0 ?></p>
+                    <a href="alternatif.php" class="btn btn-primary">Kelola</a>
                 </div>
             </div>
             
-            <div class="col-md-3">
-                <div class="card bg-success text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title mb-0">Total Kriteria</h6>
-                                <h2 class="mt-2 mb-0"><?= $totalKriteria ?? 0 ?></h2>
-                            </div>
-                            <i class="bi bi-list-check fs-1"></i>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-success-dark">
-                        <a href="kriteria.php" class="text-white text-decoration-none">
-                            Kelola Kriteria <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
+            <div class="col">
+                <div class="stats-card">
+                    <h3>Total Kriteria</h3>
+                    <p><?= $totalKriteria ?? 0 ?></p>
+                    <a href="kriteria.php" class="btn btn-primary">Kelola</a>
                 </div>
             </div>
             
-            <div class="col-md-3">
-                <div class="card bg-warning text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title mb-0">Penilaian Lengkap</h6>
-                                <h2 class="mt-2 mb-0"><?= $completedAssessments ?? 0 ?></h2>
-                            </div>
-                            <i class="bi bi-clipboard-check fs-1"></i>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-warning-dark">
-                        <a href="penilaian.php" class="text-white text-decoration-none">
-                            Input Penilaian <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
+            <div class="col">
+                <div class="stats-card">
+                    <h3>Penilaian Lengkap</h3>
+                    <p><?= $completedAssessments ?? 0 ?></p>
+                    <a href="penilaian.php" class="btn btn-primary">Input</a>
                 </div>
             </div>
             
-            <div class="col-md-3">
-                <div class="card bg-info text-white">
-                    <div class="card-body">
-                        <div class="d-flex justify-content-between align-items-center">
-                            <div>
-                                <h6 class="card-title mb-0">Perhitungan Terakhir</h6>
-                                <p class="mt-2 mb-0">
-                                    <?= $lastCalculation ? date('d/m/Y H:i', strtotime($lastCalculation)) : 'Belum ada' ?>
-                                </p>
-                            </div>
-                            <i class="bi bi-calculator fs-1"></i>
-                        </div>
-                    </div>
-                    <div class="card-footer bg-info-dark">
-                        <a href="hasil.php" class="text-white text-decoration-none">
-                            Lihat Hasil <i class="bi bi-arrow-right"></i>
-                        </a>
-                    </div>
+            <div class="col">
+                <div class="stats-card">
+                    <h3>Perhitungan Terakhir</h3>
+                    <p><?= $lastCalculation ? date('d/m/Y H:i', strtotime($lastCalculation)) : '-' ?></p>
+                    <a href="hasil.php" class="btn btn-primary">Lihat</a>
                 </div>
             </div>
         </div>
 
-        <div class="row">
-            <div class="col-md-12">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="mb-0">Sistem Pendukung Keputusan - Metode Weighted Product (WP)</h4>
-                    </div>
+        <div class="card">
+            <div class="card-header">
+                <h2 class="card-title">Sistem Pendukung Keputusan - Metode WP</h2>
+            </div>
                     <div class="card-body">
                         <h5>Langkah-langkah Perhitungan:</h5>
                         <ol>
@@ -166,7 +139,6 @@ try {
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/script.js"></script>
 </body>
 </html>
