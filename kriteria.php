@@ -1,45 +1,59 @@
 <?php
-require_once 'includes/config.php';
+require_once 'config.php';
 
 // Handle form submission
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (isset($_POST['action'])) {
+        $nama = sanitize($_POST['nama']);
+        $bobot = (float)$_POST['bobot'];
+        $tipe = sanitize($_POST['tipe']);
+        
         if ($_POST['action'] === 'add') {
-            $nama = sanitize($_POST['nama']);
-            $bobot = (float)$_POST['bobot'];
-            $tipe = sanitize($_POST['tipe']);
-            
             try {
+                // Check if total weight with new addition would exceed 1
+                $stmt = $db->query("SELECT SUM(bobot) as total FROM kriteria");
+                $currentTotal = (float)$stmt->fetchColumn();
+                if (($currentTotal + $bobot) > 1) {
+                    throw new Exception("Total bobot tidak boleh melebihi 1");
+                }
+
                 $stmt = $db->prepare("INSERT INTO kriteria (nama, bobot, tipe) VALUES (?, ?, ?)");
                 $stmt->execute([$nama, $bobot, $tipe]);
-                setFlashMessage('success', 'Kriteria berhasil ditambahkan');
-            } catch (PDOException $e) {
-                setFlashMessage('danger', 'Gagal menambahkan kriteria: ' . $e->getMessage());
+                setFlash('success', 'Kriteria berhasil ditambahkan');
+            } catch(Exception $e) {
+                setFlash('danger', 'Gagal menambahkan kriteria: ' . $e->getMessage());
             }
         } 
         elseif ($_POST['action'] === 'edit') {
             $id = (int)$_POST['id'];
-            $nama = sanitize($_POST['nama']);
-            $bobot = (float)$_POST['bobot'];
-            $tipe = sanitize($_POST['tipe']);
-            
             try {
+                // Get current weight of the criteria being edited
+                $stmt = $db->prepare("SELECT bobot FROM kriteria WHERE id = ?");
+                $stmt->execute([$id]);
+                $currentBobot = (float)$stmt->fetchColumn();
+
+                // Check if total weight would exceed 1
+                $stmt = $db->query("SELECT SUM(bobot) as total FROM kriteria WHERE id != $id");
+                $otherTotal = (float)$stmt->fetchColumn();
+                if (($otherTotal + $bobot) > 1) {
+                    throw new Exception("Total bobot tidak boleh melebihi 1");
+                }
+
                 $stmt = $db->prepare("UPDATE kriteria SET nama = ?, bobot = ?, tipe = ? WHERE id = ?");
                 $stmt->execute([$nama, $bobot, $tipe, $id]);
-                setFlashMessage('success', 'Kriteria berhasil diperbarui');
-            } catch (PDOException $e) {
-                setFlashMessage('danger', 'Gagal memperbarui kriteria: ' . $e->getMessage());
+                setFlash('success', 'Kriteria berhasil diperbarui');
+            } catch(Exception $e) {
+                setFlash('danger', 'Gagal memperbarui kriteria: ' . $e->getMessage());
             }
         }
         elseif ($_POST['action'] === 'delete') {
             $id = (int)$_POST['id'];
-            
             try {
                 $stmt = $db->prepare("DELETE FROM kriteria WHERE id = ?");
                 $stmt->execute([$id]);
-                setFlashMessage('success', 'Kriteria berhasil dihapus');
-            } catch (PDOException $e) {
-                setFlashMessage('danger', 'Gagal menghapus kriteria: ' . $e->getMessage());
+                setFlash('success', 'Kriteria berhasil dihapus');
+            } catch(PDOException $e) {
+                setFlash('danger', 'Gagal menghapus kriteria: ' . $e->getMessage());
             }
         }
     }
@@ -53,8 +67,8 @@ try {
     
     // Calculate total bobot
     $totalBobot = array_sum(array_column($kriterias, 'bobot'));
-} catch (PDOException $e) {
-    setFlashMessage('danger', 'Gagal mengambil data kriteria: ' . $e->getMessage());
+} catch(PDOException $e) {
+    setFlash('danger', 'Gagal mengambil data kriteria: ' . $e->getMessage());
     $kriterias = [];
     $totalBobot = 0;
 }
@@ -65,42 +79,59 @@ try {
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Kriteria - SPK Metode WP</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="assets/css/style.css" rel="stylesheet">
+    <title>Kriteria - <?= SITE_NAME ?></title>
+    <link rel="stylesheet" href="assets/css/style.css">
 </head>
 <body>
-    <?php include 'includes/navbar.php'; ?>
+    <nav class="navbar">
+        <div class="navbar-container">
+            <a href="index.php" class="navbar-brand"><?= SITE_NAME ?></a>
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a href="index.php" class="nav-link">Home</a>
+                </li>
+                <li class="nav-item">
+                    <a href="alternatif.php" class="nav-link">Alternatif</a>
+                </li>
+                <li class="nav-item">
+                    <a href="kriteria.php" class="nav-link active">Kriteria</a>
+                </li>
+                <li class="nav-item">
+                    <a href="penilaian.php" class="nav-link">Penilaian</a>
+                </li>
+                <li class="nav-item">
+                    <a href="hasil.php" class="nav-link">Hasil</a>
+                </li>
+            </ul>
+        </div>
+    </nav>
 
-    <div class="container mt-4">
+    <div class="container">
         <?php
-        $flash = getFlashMessage();
-        if ($flash) {
-            echo "<div class='alert alert-{$flash['type']} alert-dismissible fade show' role='alert'>
-                    {$flash['message']}
-                    <button type='button' class='btn-close' data-bs-dismiss='alert'></button>
-                  </div>";
-        }
-        
-        // Show warning if total bobot is not 1
-        if (abs($totalBobot - 1) > 0.0001) {
-            echo "<div class='alert alert-warning' role='alert'>
-                    Total bobot saat ini adalah " . number_format($totalBobot, 4) . ". 
-                    Total bobot kriteria harus berjumlah 1.
-                  </div>";
-        }
+        $flash = getFlash();
+        if ($flash): 
         ?>
+        <div class="alert alert-<?= $flash['type'] ?>">
+            <?= $flash['message'] ?>
+        </div>
+        <?php endif; ?>
+
+        <?php if (abs($totalBobot - 1) > 0.0001): ?>
+        <div class="alert alert-warning">
+            Total bobot saat ini adalah <?= formatNumber($totalBobot) ?>. Total bobot kriteria harus berjumlah 1.
+        </div>
+        <?php endif; ?>
 
         <div class="card">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <h5 class="mb-0">Data Kriteria</h5>
-                <button type="button" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#addModal">
+            <div class="card-header">
+                <h2 class="card-title">Data Kriteria</h2>
+                <button class="btn btn-primary" onclick="showModal('addModal')">
                     Tambah Kriteria
                 </button>
             </div>
             <div class="card-body">
                 <div class="table-responsive">
-                    <table class="table table-striped table-hover">
+                    <table class="table">
                         <thead>
                             <tr>
                                 <th>No</th>
@@ -115,22 +146,16 @@ try {
                             <tr>
                                 <td><?= $index + 1 ?></td>
                                 <td><?= htmlspecialchars($kriteria['nama']) ?></td>
-                                <td><?= number_format($kriteria['bobot'], 4) ?></td>
+                                <td><?= formatNumber($kriteria['bobot']) ?></td>
                                 <td><?= ucfirst($kriteria['tipe']) ?></td>
                                 <td>
-                                    <button type="button" class="btn btn-sm btn-warning btn-action"
-                                            data-bs-toggle="modal" data-bs-target="#editModal"
-                                            data-id="<?= $kriteria['id'] ?>"
-                                            data-nama="<?= htmlspecialchars($kriteria['nama']) ?>"
-                                            data-bobot="<?= $kriteria['bobot'] ?>"
-                                            data-tipe="<?= $kriteria['tipe'] ?>">
+                                    <button class="btn btn-primary" onclick="editKriteria(<?= htmlspecialchars(json_encode($kriteria)) ?>)">
                                         Edit
                                     </button>
-                                    <form action="kriteria.php" method="POST" class="d-inline" 
-                                          onsubmit="return confirm('Apakah Anda yakin ingin menghapus kriteria ini?')">
+                                    <form action="kriteria.php" method="POST" class="d-inline" onsubmit="return confirm('Yakin ingin menghapus?')">
                                         <input type="hidden" name="action" value="delete">
                                         <input type="hidden" name="id" value="<?= $kriteria['id'] ?>">
-                                        <button type="submit" class="btn btn-sm btn-danger btn-action">Hapus</button>
+                                        <button type="submit" class="btn btn-danger">Hapus</button>
                                     </form>
                                 </td>
                             </tr>
@@ -148,122 +173,84 @@ try {
     </div>
 
     <!-- Add Modal -->
-    <div class="modal fade" id="addModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Tambah Kriteria</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="kriteria.php" method="POST" class="needs-validation" novalidate>
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="add">
-                        <div class="mb-3">
-                            <label for="nama" class="form-label">Nama Kriteria</label>
-                            <input type="text" class="form-control" id="nama" name="nama" required>
-                            <div class="invalid-feedback">
-                                Nama kriteria harus diisi
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="bobot" class="form-label">Bobot</label>
-                            <input type="number" class="form-control" id="bobot" name="bobot" 
-                                   step="0.0001" min="0" max="1" required>
-                            <div class="invalid-feedback">
-                                Bobot harus diisi dengan nilai antara 0 dan 1
-                            </div>
-                            <small class="text-muted">
-                                Total bobot semua kriteria harus berjumlah 1
-                            </small>
-                        </div>
-                        <div class="mb-3">
-                            <label for="tipe" class="form-label">Tipe</label>
-                            <select class="form-select" id="tipe" name="tipe" required>
-                                <option value="benefit">Benefit</option>
-                                <option value="cost">Cost</option>
-                            </select>
-                            <div class="invalid-feedback">
-                                Tipe kriteria harus dipilih
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-primary">Simpan</button>
-                    </div>
-                </form>
+    <div id="addModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Tambah Kriteria</h3>
+                <span class="close" onclick="closeModal('addModal')">&times;</span>
             </div>
+            <form action="kriteria.php" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="add">
+                    <div class="form-group">
+                        <label class="form-label">Nama Kriteria</label>
+                        <input type="text" name="nama" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Bobot</label>
+                        <input type="number" name="bobot" class="form-control" step="0.01" min="0" max="1" required>
+                        <small>Bobot harus bernilai antara 0 dan 1. Total bobot semua kriteria harus berjumlah 1.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tipe</label>
+                        <select name="tipe" class="form-control" required>
+                            <option value="benefit">Benefit</option>
+                            <option value="cost">Cost</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('addModal')">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan</button>
+                </div>
+            </form>
         </div>
     </div>
 
     <!-- Edit Modal -->
-    <div class="modal fade" id="editModal" tabindex="-1">
-        <div class="modal-dialog">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title">Edit Kriteria</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
-                </div>
-                <form action="kriteria.php" method="POST" class="needs-validation" novalidate>
-                    <div class="modal-body">
-                        <input type="hidden" name="action" value="edit">
-                        <input type="hidden" name="id" id="edit_id">
-                        <div class="mb-3">
-                            <label for="edit_nama" class="form-label">Nama Kriteria</label>
-                            <input type="text" class="form-control" id="edit_nama" name="nama" required>
-                            <div class="invalid-feedback">
-                                Nama kriteria harus diisi
-                            </div>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_bobot" class="form-label">Bobot</label>
-                            <input type="number" class="form-control" id="edit_bobot" name="bobot" 
-                                   step="0.0001" min="0" max="1" required>
-                            <div class="invalid-feedback">
-                                Bobot harus diisi dengan nilai antara 0 dan 1
-                            </div>
-                            <small class="text-muted">
-                                Total bobot semua kriteria harus berjumlah 1
-                            </small>
-                        </div>
-                        <div class="mb-3">
-                            <label for="edit_tipe" class="form-label">Tipe</label>
-                            <select class="form-select" id="edit_tipe" name="tipe" required>
-                                <option value="benefit">Benefit</option>
-                                <option value="cost">Cost</option>
-                            </select>
-                            <div class="invalid-feedback">
-                                Tipe kriteria harus dipilih
-                            </div>
-                        </div>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                        <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
-                    </div>
-                </form>
+    <div id="editModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">Edit Kriteria</h3>
+                <span class="close" onclick="closeModal('editModal')">&times;</span>
             </div>
+            <form action="kriteria.php" method="POST">
+                <div class="modal-body">
+                    <input type="hidden" name="action" value="edit">
+                    <input type="hidden" name="id" id="edit_id">
+                    <div class="form-group">
+                        <label class="form-label">Nama Kriteria</label>
+                        <input type="text" name="nama" id="edit_nama" class="form-control" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Bobot</label>
+                        <input type="number" name="bobot" id="edit_bobot" class="form-control" step="0.01" min="0" max="1" required>
+                        <small>Bobot harus bernilai antara 0 dan 1. Total bobot semua kriteria harus berjumlah 1.</small>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">Tipe</label>
+                        <select name="tipe" id="edit_tipe" class="form-control" required>
+                            <option value="benefit">Benefit</option>
+                            <option value="cost">Cost</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn" onclick="closeModal('editModal')">Batal</button>
+                    <button type="submit" class="btn btn-primary">Simpan Perubahan</button>
+                </div>
+            </form>
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="assets/js/script.js"></script>
     <script>
-        // Handle edit modal data
-        const editModal = document.getElementById('editModal');
-        if (editModal) {
-            editModal.addEventListener('show.bs.modal', function(event) {
-                const button = event.relatedTarget;
-                const id = button.getAttribute('data-id');
-                const nama = button.getAttribute('data-nama');
-                const bobot = button.getAttribute('data-bobot');
-                const tipe = button.getAttribute('data-tipe');
-                
-                editModal.querySelector('#edit_id').value = id;
-                editModal.querySelector('#edit_nama').value = nama;
-                editModal.querySelector('#edit_bobot').value = bobot;
-                editModal.querySelector('#edit_tipe').value = tipe;
-            });
+        function editKriteria(kriteria) {
+            document.getElementById('edit_id').value = kriteria.id;
+            document.getElementById('edit_nama').value = kriteria.nama;
+            document.getElementById('edit_bobot').value = kriteria.bobot;
+            document.getElementById('edit_tipe').value = kriteria.tipe;
+            showModal('editModal');
         }
     </script>
 </body>
