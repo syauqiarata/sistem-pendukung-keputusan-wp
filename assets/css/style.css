@@ -1,0 +1,158 @@
+/* General styles */
+body {
+    background-color: #f8f9fa;
+    font-family: 'Arial', sans-serif;
+}
+
+.navbar {
+    margin-bottom: 2rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+}
+
+/* Card styles */
+.card {
+    box-shadow: 0 2px 4px rgba(0,0,0,.1);
+    border: none;
+    margin-bottom: 2rem;
+    border-radius: 8px;
+}
+
+.card-header {
+    background-color: #fff;
+    border-bottom: 1px solid rgba(0,0,0,.125);
+    padding: 1rem 1.25rem;
+}
+
+/* Table styles */
+.table {
+    margin-bottom: 0;
+}
+
+.table th {
+    background-color: #f8f9fa;
+    border-bottom: 2px solid #dee2e6;
+    font-weight: 600;
+}
+
+.table td {
+    vertical-align: middle;
+}
+
+/* Button styles */
+.btn-action {
+    padding: .25rem .5rem;
+    font-size: .875rem;
+    line-height: 1.5;
+    border-radius: .2rem;
+    margin: 0 .25rem;
+}
+
+/* Alert styles */
+.alert {
+    margin-bottom: 1rem;
+    border-radius: 8px;
+    padding: 1rem;
+}
+
+/* Form styles */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-label {
+    font-weight: 500;
+    margin-bottom: .5rem;
+}
+
+.form-control {
+    border-radius: 4px;
+    border: 1px solid #ced4da;
+    padding: .5rem .75rem;
+}
+
+.form-control:focus {
+    border-color: #80bdff;
+    box-shadow: 0 0 0 0.2rem rgba(0,123,255,.25);
+}
+
+/* Loading spinner */
+.spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(0,0,0,.1);
+    border-left-color: #007bff;
+    border-radius: 50%;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Modal styles */
+.modal-content {
+    border-radius: 8px;
+    border: none;
+    box-shadow: 0 0.5rem 1rem rgba(0,0,0,.15);
+}
+
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+    padding: 1rem 1.5rem;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    background-color: #f8f9fa;
+    border-top: 1px solid #dee2e6;
+    padding: 1rem 1.5rem;
+}
+
+/* Pagination styles */
+.pagination {
+    margin-bottom: 0;
+}
+
+.page-link {
+    padding: .5rem .75rem;
+    margin-left: -1px;
+    border: 1px solid #dee2e6;
+}
+
+.page-item.active .page-link {
+    background-color: #007bff;
+    border-color: #007bff;
+}
+
+/* Custom utility classes */
+.text-truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.bg-light-hover:hover {
+    background-color: #f8f9fa;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .card-header {
+        padding: .75rem 1rem;
+    }
+    
+    .table-responsive {
+        margin-bottom: 1rem;
+    }
+    
+    .btn-action {
+        display: block;
+        width: 100%;
+        margin: .25rem 0;
+    }
+}
