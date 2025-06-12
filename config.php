@@ -1,15 +1,17 @@
 <?php
-$host = 'localhost';
-$dbname = 'wp_calculator';
-$username = 'root';
-$password = '';
+session_start();
+
+// Database configuration
+$db_host = 'localhost';
+$db_name = 'spk_wp';
+$db_user = 'root';
+$db_pass = '';
 
 try {
-    $db = new PDO("mysql:host=$host;dbname=$dbname", $username, $password);
+    $db = new PDO("mysql:host=$db_host;dbname=$db_name", $db_user, $db_pass);
     $db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 } catch(PDOException $e) {
-    echo "Connection failed: " . $e->getMessage();
-    die();
+    die("Connection failed: " . $e->getMessage());
 }
 
 // Helper functions
@@ -17,19 +19,14 @@ function sanitize($data) {
     return htmlspecialchars(strip_tags(trim($data)));
 }
 
-function redirect($location) {
-    header("Location: $location");
-    exit;
-}
-
-function setFlashMessage($type, $message) {
+function setFlash($type, $message) {
     $_SESSION['flash'] = [
         'type' => $type,
         'message' => $message
     ];
 }
 
-function getFlashMessage() {
+function getFlash() {
     if (isset($_SESSION['flash'])) {
         $flash = $_SESSION['flash'];
         unset($_SESSION['flash']);
@@ -38,8 +35,15 @@ function getFlashMessage() {
     return null;
 }
 
-// Start session if not already started
-if (session_status() === PHP_SESSION_NONE) {
-    session_start();
+function redirect($url) {
+    header("Location: $url");
+    exit;
 }
+
+function formatNumber($number, $decimals = 4) {
+    return number_format($number, $decimals, '.', '');
+}
+
+// Constants
+define('SITE_NAME', 'SPK Metode WP');
 ?>
