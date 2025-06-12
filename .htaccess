@@ -1,0 +1,63 @@
+# Prevent directory listing
+Options -Indexes
+
+# Protect files and directories
+<FilesMatch "^\.">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Protect sensitive directories
+<DirectoryMatch "^/.*/(?:includes|logs|uploads)/">
+    Order allow,deny
+    Deny from all
+</DirectoryMatch>
+
+# PHP error handling
+php_flag display_errors off
+php_value error_reporting E_ALL
+php_value error_log logs/error.log
+
+# Security headers
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set X-XSS-Protection "1; mode=block"
+    Header set Referrer-Policy "strict-origin-when-cross-origin"
+    Header set Content-Security-Policy "default-src 'self' https:; script-src 'self' 'unsafe-inline' 'unsafe-eval' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' https:;"
+</IfModule>
+
+# URL rewriting
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteBase /
+
+    # Redirect to HTTPS if available
+    # RewriteCond %{HTTPS} off
+    # RewriteRule ^(.*)$ https://%{HTTP_HOST}%{REQUEST_URI} [L,R=301]
+
+    # Prevent direct access to .php files in includes directory
+    RewriteRule ^includes/.+\.php$ - [F]
+
+    # Prevent direct access to log files
+    RewriteRule ^logs/.+\.log$ - [F]
+
+    # Custom error pages
+    ErrorDocument 400 /error.php?code=400
+    ErrorDocument 401 /error.php?code=401
+    ErrorDocument 403 /error.php?code=403
+    ErrorDocument 404 /error.php?code=404
+    ErrorDocument 500 /error.php?code=500
+</IfModule>
+
+# PHP settings
+<IfModule mod_php.c>
+    php_value upload_max_filesize 5M
+    php_value post_max_size 6M
+    php_value max_execution_time 300
+    php_value max_input_time 300
+    php_value memory_limit 256M
+    php_flag session.cookie_httponly on
+    php_flag session.use_only_cookies on
+    php_flag session.use_strict_mode on
+</IfModule>
